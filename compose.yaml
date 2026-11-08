@@ -1,0 +1,51 @@
+name: logpulse
+
+x-app-env: &app-env
+  REDIS_HOST: ${REDIS_HOST:-redis}      # внутри сети Compose — DNS-имя сервиса, не localhost
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_DB: ${REDIS_DB:-0}
+  REDIS_TIMEOUT: ${REDIS_TIMEOUT:-5}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]   # AOF: данные переживают перезапуск
+    volumes:
+      - redis_data:/data                               # именованный volume
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # порт Redis наружу не публикуется
+
+  api:
+    build: .
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"             # только localhost хоста
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "logpulse.worker"]
+    environment:
+      <<: *app-env
+      WORKER_NAME: worker-1                            # стабильное имя consumer
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:

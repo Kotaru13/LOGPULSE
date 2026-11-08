@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+# Секреты и локальные файлы
+.env
+*.rdb
+*.aof
+*.sqlite3
+*.db
+*.dump
+# Артефакты
+*.bundle
+*.zip
+.idea/
+.vscode/
+.DS_Store
